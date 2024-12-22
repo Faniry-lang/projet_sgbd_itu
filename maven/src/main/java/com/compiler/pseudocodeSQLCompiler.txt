@@ -1,0 +1,17 @@
+function processOperator(string tableName,relation table,node operator) :
+    
+    mappedDomaines = obtenir les types des domaines mappés a leur nom
+    
+    filteredRelation = declarer une nouvelle relation 
+    
+    leftNode = obtenir le node de l'operateur a gauche (node de la colonne target)
+    
+    rightNode = obtenir le node de l'operateur a droite (node de la valeur avec qui on va comparer la colonne)
+    
+    operator = obtenir la chaine de caractere representant l'operateur par sa clé ('>','<','=',etc.)
+    
+    targetedColumn = obtenir la chaine de caractere representant la colonne target
+    
+    value = la valeur avec qui comparer la colone target parsée en utilisant les domaines mappés
+
+    

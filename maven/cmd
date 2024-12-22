@@ -1,0 +1,30 @@
+mvn archetype:generate -DgroupId=com.example -DartifactId=my-maven-project -DarchetypeArtifactId=maven-archetype-quickstart -DinteractiveMode=false
+majunga401
+
+netsh advfirewall firewall add rule name="Autoriser Port 3000" dir=in action=allow protocol=TCP localport=3000
+jar cf sqlserver.jar -C classes .
+
+
+javac --module-path C:\javafx-sdk\lib --add-modules javafx.controls,javafx.fxml InstallationApp.java
+java --module-path C:\javafx-sdk\lib --add-modules javafx.controls,javafx.fxml InstallationApp
+
+
+jar cfm lsql_jdbc.jar mf-driver/MANIFEST.MF -C ../target/classes/com/jdbc . 
+jar cfm lsql_install.jar mf-installator/MANIFEST.MF *.class  -C resources/ .
+jar cfm lsql_client.jar mf-sqlclient/MANIFEST.MF -C ../target/classes .
+jar cfm lsql_server.jar mf-sqlserver/MANIFEST.MF -C ../target/classes . -C resources/ .
+jar cfm lsql_replica.jar mf-sqlserver/MANIFEST.MF -C ../target/classes . -C resources/ .
+
+
+--module-path "C:javafx-sdk/lib" --add-modules javafx.controls,javafx.fxml
+
+jar cfm sqlserver.jar MANIFEST.MF -C target/classes/ . 
+
+LightSql/
+├── conf/
+│   └── config.txt
+├── db/
+│   └── databases.json
+├── log/
+│   └── log.txt
+└── replica/

@@ -1,0 +1,940 @@
+package com.ast.parse;
+
+import com.node.*;
+import com.ast.node.*;
+
+import java.util.*;
+
+public class ParseEngine {
+
+     public static int getPrecedence(String keyword) {
+        Map<String, Integer> precedenceMap = new HashMap<>();
+        
+        precedenceMap.put("INSERT",1);
+        precedenceMap.put("INTO",2);
+        precedenceMap.put("INSERT INTO",1);
+        precedenceMap.put("VALUES",2);
+        precedenceMap.put("SELECT",1);
+        precedenceMap.put("DISTINCT",2);
+        precedenceMap.put("FROM",1);
+        precedenceMap.put("CASE",2);
+        precedenceMap.put("WHEN",3);
+        precedenceMap.put("THEN",4);
+        precedenceMap.put("ELSE",4);
+        precedenceMap.put("END",2);
+        precedenceMap.put("JOIN",2);
+        precedenceMap.put("LEFT JOIN",2);
+        precedenceMap.put("RIGHT JOIN",2);
+        precedenceMap.put("INNER JOIN",2);
+        precedenceMap.put("ON",3);
+        precedenceMap.put("GROUP",1);
+        precedenceMap.put("GROUP BY",1);
+        precedenceMap.put("ORDER",1);
+        precedenceMap.put("ORDER BY",1);
+        precedenceMap.put("BY",2);
+        precedenceMap.put("DESC",2);
+        precedenceMap.put("ASC",2);
+        precedenceMap.put("WHERE",1);
+        precedenceMap.put("BETWEEN",3);
+        precedenceMap.put("AND",2);
+        precedenceMap.put("OR",2);
+        precedenceMap.put("HAVING",1);
+        precedenceMap.put("=",3);
+        precedenceMap.put("<=",3);        
+        precedenceMap.put(">=",3);
+        precedenceMap.put("<>",3);
+        precedenceMap.put("!=",3);
+        precedenceMap.put("IN",3);
+
+        return precedenceMap.getOrDefault(keyword.toUpperCase(), Integer.MAX_VALUE);
+    }
+
+    public boolean isSqlKey(String word) {
+
+        word.trim();
+
+        String[] sqlKeywords = {
+            "SELECT", "FROM", "WHERE", "JOIN", "INNER","INNER JOIN", "LEFT JOIN", "RIGHT JOIN","RIGHT","LEFT", "FULL", "OUTER",
+            "GROUP","GROUP BY", "BY", "HAVING", "ORDER","ORDER BY","LIMIT", "OFFSET",
+            "INSERT", "INTO","INSERT INTO", "VALUES", "UPDATE", "SET", "DELETE",
+            "CREATE", "TABLE", "VIEW", "DROP", "ALTER", "ADD",
+            "DISTINCT", "AS", "NOT", "IN", "IS",
+            "LIKE", "EXISTS", "UNION", "ALL",
+            "AVG","SUM","COUNT","MAX","MIN",
+            "AND","OR","BETWEEN","ON",
+            "DESC","ASC",
+            "=",">","<","<=",">=","<>","!=","IN","NOT","CASE","WHEN","THEN","ELSE"
+        };
+
+        for (String keyword : sqlKeywords) {
+            if (keyword.equalsIgnoreCase(word)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public boolean isOperator(String word) {
+        word.trim();
+
+        String[] sqlKeywords = {
+            "=",">","<","<=",">=","<>","!=","IN","NOT","AND","OR","BETWEEN"
+        };
+
+        for (String keyword : sqlKeywords) {
+            if (keyword.equalsIgnoreCase(word)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public boolean isCommand(String word) {
+        word.trim();
+
+        String[] sqlKeywords = {
+            "SELECT","INSERT","UPDATE","DELETE"
+        };
+
+        for (String keyword : sqlKeywords) {
+            if (keyword.equalsIgnoreCase(word)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public boolean isFunction(String word) {
+        word.trim();
+
+        String[] sqlKeywords = {
+            "AVG","SUM","COUNT","MAX","MIN",
+        };
+
+        for (String keyword : sqlKeywords) {
+            if (keyword.equalsIgnoreCase(word)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public static String addSpaceAfterParentheses(String sqlQuery) {
+        String modifiedQuery = sqlQuery.replaceAll("\\(", " ( ")
+                                       .replaceAll("\\)", " ) ");
+        return modifiedQuery.trim().replaceAll("\\s+", " ");
+    }
+
+    public ListIterator getTokens(String sql) {
+        sql = this.addSpaceAfterParentheses(sql.toUpperCase());
+        String input = sql.replaceAll("\\s+"," ")
+                                    .replaceAll(", ",",")
+                                    .replaceAll(" ,",",")
+                                    .trim();
+        String delim = " ,";
+        StringTokenizer tokenizer = new StringTokenizer(input,delim,true);
+        ArrayList<String> tokens = new ArrayList<>();
+        while(tokenizer.hasMoreTokens()) {
+            tokens.add(tokenizer.nextToken());
+        }
+
+        ListIterator<String> list = tokens.listIterator();
+
+        return list;
+    }
+
+    public void buildAst(Node root,Stack<Node> pile,String sql) {
+
+        Node currentNode = root;
+        ListIterator<String> tokens = this.getTokens(sql);
+        while(tokens.hasNext()) {
+            Node node  = new Node();
+            Node parent = new Node();
+            String token = tokens.next();
+            if(token.equals(",")) {
+                continue;
+            }
+            if(token.equals(" ")) { 
+                Node lastNode = pile.peek();
+                // verifier si les deux derniers tokens ne sont pas isolés
+                if(!tokens.previous().equals("(")) {
+                    tokens.next();
+                    continue;
+                }
+                token = tokens.next();
+                if(token.equals("AS")) {
+                    tokens.next();
+                    token = tokens.next();
+                    lastNode.setKey(token);
+                }
+                else if((lastNode instanceof Leaf && !this.isSqlKey(token))) {
+                    lastNode.setKey(token);
+                } else {
+                    tokens.previous();
+                }
+                continue;
+            }
+
+            if(token.equals("INSERT")) {
+                tokens.next();
+                String nextToken = tokens.next();
+                if(!nextToken.equals("INTO")) {
+                    // throw new Exception("Missing join statement");
+                }
+                token += " "+nextToken;
+            }
+
+            if(token.equals("RIGHT") || token.equals("LEFT") || token.equals("INNER")) {
+                tokens.next();
+                String nextToken = tokens.next();
+                if(!nextToken.equals("JOIN")) {
+                    // throw new Exception("Missing join statement");
+                }
+                token += " "+nextToken;
+            }
+
+            if(token.equals("ORDER")) {
+                tokens.next();
+                String nextToken = tokens.next();
+                if(!nextToken.equals("BY")) {
+                    // throw new Exception("Missing by statement");
+                }
+                token += " "+nextToken;
+            }
+
+            if(token.equals("GROUP")) {
+                tokens.next();
+                String nextToken = tokens.next();
+                if(!nextToken.equals("BY")) {
+                    // throw new Exception("Missing by statement");
+                }
+                token += " "+nextToken;
+            }
+
+            if(this.isSqlKey(token)) {
+                node.setKey(token);
+                
+                parent = this.determineParent(root,currentNode,node);
+
+                if(this.isOperator(node.getKey())) {
+                    this.handleOperator(node,parent);
+                }
+
+                if(node.getKey().equals("CASE")) {
+                    node = this.handleCaseNode(node,tokens,pile);
+                }
+
+                if(this.isFunction(node.getKey())) {
+                    node = this.handleFunctionNode(node,tokens);
+                } 
+
+                if(node.getKey().equals("BETWEEN")) {
+                    node = this.handleBetweenNode(tokens,pile);
+                }
+
+                this.handleSortingNode(node,pile);
+
+                if(node.getType() == null) {
+                    if(this.isCommand(node.getKey())) {
+                        node.setType("COMMAND");
+                    } else {
+                        node.setType("CLAUSE");
+                    }
+                }
+
+                pile.push(node);
+                currentNode = node;
+            } else if(token.equals("(")) {
+
+                Node relay = this.handleSubQueryNode(root,currentNode,tokens,pile);
+                if(relay.getChildren().size() > 1) {
+                    parent = relay.getChildren().get(0);
+                    node = relay.getChildren().get(1);
+                } 
+
+            } else {
+                Leaf leaf = new Leaf(token);
+                pile.push(leaf);
+                parent = currentNode;
+                node = leaf;
+                node.setType("IDENTIFIER");
+            }
+            parent.addChild(node);
+            node.setParent(parent);
+        }
+    }
+
+    public Node handleBetweenNode(ListIterator<String> tokens,Stack<Node> pile) {
+
+        Node betweenNode = new Node();
+        betweenNode.setKey("BETWEEN");
+        betweenNode.setType("OPERATOR");
+
+        tokens.next();
+        String token = tokens.next();
+        if(this.isSqlKey(token)) {
+            // throw new Exception("You have an sql typo around BETWEEN...");
+        }
+        Node logicalOperatorNode = new Node();
+        logicalOperatorNode.setType("OPERATOR");
+        Node args1 = new Node();
+        args1.setKey(token);
+        args1.setType("IDENTIFIER");
+
+        tokens.next();
+        token = tokens.next();
+        if(!this.isOperator(token) && !(token.equals("AND") || token.equals("OR"))) {
+            // throw new Exception("You have an sql typo around BETWEEN...");
+        }
+
+        logicalOperatorNode.setKey(token);
+
+        tokens.next();
+        token = tokens.next();
+        if(this.isSqlKey(token)) {
+            // throw new Exception("You have an sql typo around BETWEEN...");
+        }
+        Node args2 = new Node();
+        args2.setKey(token);
+        args2.setType("IDENTIFIER");
+
+        logicalOperatorNode.addChild(args1);
+        args1.setParent(logicalOperatorNode);
+        logicalOperatorNode.addChild(args2);
+        args2.setParent(logicalOperatorNode);
+
+        Node lastNode = pile.peek();
+        lastNode.getParent().removeChild(lastNode);
+        lastNode.setParent(betweenNode);
+        betweenNode.addChild(lastNode);
+
+        betweenNode.addChild(logicalOperatorNode);
+        logicalOperatorNode.setParent(betweenNode);
+
+
+        return betweenNode;
+
+    }
+
+    public void handleSortingNode(Node node,Stack<Node> pile) {
+        if(node.getKey().equals("DESC") || node.getKey().equals("ASC")) {
+            Node lastNode = pile.peek();
+            lastNode.getParent().removeChild(lastNode);
+            lastNode.setParent(node);
+            node.addChild(lastNode);
+        }
+    }
+
+    public Node handleSubQueryNode(Node root,Node currentNode, ListIterator<String> tokens, Stack<Node> pile) {
+        Stack<String> stack = new Stack<>();
+        stack.push("(");
+
+        StringBuilder subquery = new StringBuilder();
+        String token = tokens.next();
+        while (!stack.isEmpty()) {
+            subquery.append(" ").append(token);
+            token = tokens.next();
+            if ("(".equals(token)) {
+                stack.push(token);
+            } else if (")".equals(token)) {
+                stack.pop();
+            }
+        }
+
+        String sub = subquery.toString();
+        Node subRoot;
+        Node relay = new Node();
+        if (sub.contains("SELECT")) {
+            Node subqueryNode = new Node();
+            subqueryNode.setKey("SubQuery");
+
+            try {
+                while (token.equals(")") || token.equals(" ")) {
+                    token = tokens.next();
+                }
+
+                if ("AS".equals(token)) {
+                    tokens.next();
+                    token = tokens.next();
+                    subqueryNode.setKey(token);
+                } else if (!this.isSqlKey(token)) {
+                    subqueryNode.setKey(token);
+                } else {
+                    tokens.previous();
+                }
+            } catch (Exception e) {
+                // Gérer les exceptions 
+            }
+            subqueryNode.setType("SUBQUERY");
+            relay.addChild(currentNode);
+            relay.addChild(subqueryNode);
+            subRoot = subqueryNode;
+        } else {
+            Node imbricated = new Node();
+            imbricated.setKey("EXPRESSION");
+            imbricated.setType("EXPRESSION");
+            relay.addChild(currentNode);
+            relay.addChild(imbricated);
+            subRoot = imbricated;
+        }
+
+        this.buildAst(subRoot,pile, subquery.toString());
+
+        return relay;
+
+    }
+
+    public Node handleFunctionNode(Node node, ListIterator<String> tokens) {
+        Node functionNode = new Node();
+        functionNode.setKey("Function");
+        functionNode.setType("FUNCTION");
+        Node headNode = new Node();
+        headNode.setKey(node.getKey());
+        headNode.setType("HEAD FUNCTION");
+        functionNode.addChild(headNode);
+        headNode.setParent(functionNode);
+
+        String token = "";
+        while (tokens.hasNext() && !(token = tokens.next()).equals("(")) {
+        }
+
+        if ("(".equals(token)) {
+            token = tokens.next();
+            while (tokens.hasNext() && token.equals(" ")) {
+                token = tokens.next();
+            }
+
+            Node args = new Node();
+            args.setKey(token);
+            args.setType("IDENTIFIER");
+            headNode.addChild(args);
+            args.setParent(headNode);
+
+            while (tokens.hasNext() && !(token = tokens.next()).equals(")")) {
+            }
+
+            if (tokens.hasNext()) {
+                tokens.next(); // sauter l'espace 
+                token = tokens.next();
+                if ("AS".equals(token)) {
+                    tokens.next();
+                    token = tokens.next();
+                    if (!this.isSqlKey(token)) {
+                        functionNode.setKey(token);
+                    }
+                } else if (!this.isSqlKey(token) && Character.isLetter(token.charAt(0))) {
+                    functionNode.setKey(token);
+                } else {
+                    tokens.previous();
+                }
+            }
+        } else {
+            throw new IllegalArgumentException("Malformed function: missing opening parenthesis");
+        }
+        
+        return functionNode;    
+        
+    }
+
+    public Node handleCaseNode(Node node, ListIterator<String> tokens, Stack<Node> pile) {
+        Node caseNode = new Node();
+        caseNode.setKey(node.getKey());
+        caseNode.setType("CONDITION");
+        Node headNode = new Node();
+        headNode.setKey(node.getKey());
+        headNode.setType("HEAD CASE");
+        caseNode.addChild(headNode);
+        headNode.setParent(caseNode);
+
+        StringBuilder conditionToken = new StringBuilder();
+        try {
+            String token = tokens.next();
+            while (!token.equals("END")) {
+                conditionToken.append(" ").append(token);
+                token = tokens.next();
+            }
+            tokens.next(); 
+        } catch (Exception e) {
+        }
+
+        Stack<Node> conditionPile = new Stack<>();
+        this.buildAst(headNode, conditionPile, conditionToken.toString());
+
+        String token = "";
+        while (tokens.hasNext() && (token = tokens.next()).equals(" ")) {
+        }
+
+        if ("AS".equals(token)) {
+            tokens.next();
+            token = tokens.next();
+            if (!this.isSqlKey(token)) {
+                caseNode.setKey(token);
+            }
+        } else if (!this.isSqlKey(token) && Character.isLetter(token.charAt(0))) {
+            caseNode.setKey(token);
+        } else {
+            tokens.previous(); 
+        }
+
+        return caseNode;
+    }
+
+    public void handleOperator(Node node,Node parent) {
+        int lastIndex = parent.getChildren().size()-1;
+        if(parent.getChildren().size() > 0) {
+            Node lastChild = parent.getChildren().get(lastIndex);
+            parent.removeChild(lastChild);
+            lastChild.setParent(node);
+            node.addChild(lastChild);
+            node.setType("OPERATOR");
+        }
+    }
+
+    public Node determineParent(Node root,Node currentNode,Node node) {
+        Node parent = new Node();
+
+        Node lastChild = null;
+
+        if(root.getChildren().size() > 0) {
+            lastChild = root.getChildren().get(root.getChildren().size()-1);
+        }
+
+        if(!(currentNode instanceof Leaf)) {
+            if(this.getPrecedence(currentNode.getKey()) < this.getPrecedence(node.getKey())) {
+                parent = currentNode;
+            } else if(lastChild != null && !lastChild.equals(currentNode)) {
+                parent = lastChild;
+            } else {
+                parent = root;
+            }
+        } else {
+            parent = root;
+        }
+
+        if(parent.getType().equals("IDENTIFIER")) {
+            parent = root;
+        }
+
+        return parent;
+    }
+
+    public void printTree(Node root, String prefix, boolean isLast) {
+        // Ajouter le préfixe avec une branche ou un espace selon la position
+        String adjustedPrefix = prefix + (isLast ? "└── " : "├── ");
+        String output = "";
+        if (root instanceof Leaf) {
+            output = adjustedPrefix + ((Leaf) root).getValue();
+            if (root.getKey() != null) {
+                output += "(" + root.getKey() + ")";
+            }
+        } else {
+            output = adjustedPrefix + root.getKey();
+        }
+
+        // output += "----"+root.getType();
+
+        System.out.println(output);
+
+        // Préparer le préfixe des enfants
+        String childPrefix = prefix + (isLast ? "    " : "│   ");
+        List<Node> children = root.getChildren();
+        for (int i = 0; i < children.size(); i++) {
+            // Vérifier si l'enfant est le dernier pour ajuster l'affichage
+            boolean childIsLast = (i == children.size() - 1);
+            printTree(children.get(i), childPrefix, childIsLast);
+        }
+    }
+
+
+    public static void main(String[] args) {
+        ParseEngine engine = new ParseEngine();
+    String query = 
+        "SELECT " +
+        "u.user_id, " +
+        "u.username, " +
+        "(SELECT COUNT(*) " +
+        "FROM orders o " +
+        "WHERE o.user_id = u.user_id " +
+        "AND o.status = 'completed') AS completed_orders, " +
+        "(SELECT AVG(p.price) price " +
+        "FROM products p " +
+        "WHERE p.product_id IN ( " +
+        "SELECT oi.product_id " +
+        "FROM order_items oi " +
+        "WHERE oi.order_id IN ( " +
+        "SELECT o.order_id " +
+        "FROM orders o " +
+        "WHERE o.user_id = u.user_id " +
+        "AND o.status = 'completed' " +
+        ") " +
+        ")) avg_price_of_completed_orders, " +
+        "CASE " +
+        "WHEN u.is_active = 1 THEN 'Active' " +
+        "ELSE 'Inactive' " +
+        "END AS user_status " +
+        "FROM users u " +
+        "LEFT JOIN user_roles ur ON u.user_id = ur.user_id " +
+        "LEFT JOIN roles r ON ur.role_id = r.role_id " +
+        "WHERE " +
+        "u.registration_date >= '2020-01-01' " +
+        "AND r.role_name = 'customer' " +
+        "AND EXISTS ( " +
+        "SELECT 1 " +
+        "FROM orders o " +
+        "WHERE o.user_id = u.user_id " +
+        "AND o.order_date BETWEEN '2022-01-01' AND '2023-01-01' " +
+        ") " +
+        "ORDER BY " +
+        "avg_price_of_completed_orders DESC, " +
+        "completed_orders ASC";
+
+    // String query = "INSERT INTO Users (username, email, age, registration_date) "+
+    //             "VALUES "+
+    //             "('JohnDoe', 'johndoe@example.com', 28, '2024-12-01'), "+
+    //             "('JaneSmith', 'janesmith@example.com', 32, '2023-11-15'), "+
+    //             "('AliceWonder', 'alice@example.com', NULL, '2022-05-20') ";
+
+    // String query = "SELECT * FROM ETUDIANTS WHERE MATIERE != NULL AND CODE = 0 AND (CONDITION = TRUE OR ANOTHER_CONDITION = FALSE)";
+
+        Stack<Node> pile = new Stack<>();
+        Node root = new Node();
+        root.setKey("Query");
+        root.setType("QUERY");
+        engine.buildAst(root,pile,query);      
+        engine.printTree(root,"",true);
+
+    }
+}
+
+
+
+
+    Fonction: VER1
+    public Node determineParent(Node root,Node currentNode,Node node) {
+        Node parent = root;
+
+        if(!(currentNode instanceof Leaf)) {
+            if(this.getPrecedence(currentNode.getKey()) < this.getPrecedence(node.getKey()) ) { // verifie si la clause precedente est prioritaire , si oui on apparente la clause actuelle
+                parent = currentNode;
+
+            } else if(this.getPrecedence(currentNode.getKey()) > this.getPrecedence(node.getKey())) {
+                Node nextParent = currentNode.getParent();
+                if(nextParent != null) {
+                    while(nextParent != null && this.getPrecedence(nextParent.getKey()) > this.getPrecedence(node.getKey())) {
+                        nextParent = nextParent.getParent();
+                    } 
+
+                    if(nextParent != null) {
+                        parent = nextParent;
+                    }
+                } 
+            } else {
+                parent = currentNode.getParent();
+            }
+        } else {
+            parent = root;
+        }
+
+        return parent;
+    }
+
+    Resultat (1): FAUX
+    └── Query----QUERY
+    └── SELECT----COMMAND
+        ├── U.USER_ID----IDENTIFIER
+        ├── U.USERNAME----IDENTIFIER
+        ├── COMPLETED_ORDERS----SUBQUERY
+        │   └── SELECT----COMMAND
+        │       ├── Function----FUNCTION
+        │       │   └── COUNT----HEAD FUNCTION
+        │       │       └── *----IDENTIFIER
+        │       ├── FROM----CLAUSE
+        │       │   └── ORDERS(O)----IDENTIFIER
+        │       └── WHERE----CLAUSE
+        │           └── AND----OPERATOR
+        │               ├── =----OPERATOR
+        │               │   ├── O.USER_ID----IDENTIFIER
+        │               │   └── U.USER_ID----IDENTIFIER
+        │               └── =----OPERATOR
+        │                   ├── O.STATUS----IDENTIFIER
+        │                   └── 'COMPLETED'----IDENTIFIER
+        ├── AVG_PRICE_OF_COMPLETED_ORDERS----SUBQUERY
+        │   └── SELECT----COMMAND
+        │       ├── PRICE----FUNCTION
+        │       │   └── AVG----HEAD FUNCTION
+        │       │       └── P.PRICE----IDENTIFIER
+        │       ├── FROM----CLAUSE
+        │       │   └── PRODUCTS(P)----IDENTIFIER
+        │       └── WHERE----CLAUSE
+        │           └── IN----OPERATOR
+        │               ├── P.PRODUCT_ID----IDENTIFIER
+        │               └── SubQuery----SUBQUERY
+        │                   ├── SELECT----COMMAND
+        │                   │   └── OI.PRODUCT_ID----IDENTIFIER
+        │                   ├── FROM----CLAUSE
+        │                   │   └── ORDER_ITEMS(OI)----IDENTIFIER
+        │                   └── WHERE----CLAUSE
+        │                       └── IN----OPERATOR
+        │                           ├── OI.ORDER_ID----IDENTIFIER
+        │                           └── SubQuery----SUBQUERY
+        │                               ├── SELECT----COMMAND
+        │                               │   └── O.ORDER_ID----IDENTIFIER
+        │                               ├── FROM----CLAUSE
+        │                               │   └── ORDERS(O)----IDENTIFIER
+        │                               └── WHERE----CLAUSE
+        │                                   └── AND----OPERATOR
+        │                                       ├── =----OPERATOR
+        │                                       │   ├── O.USER_ID----IDENTIFIER  
+        │                                       │   └── U.USER_ID----IDENTIFIER  
+        │                                       └── =----OPERATOR
+        │                                           ├── O.STATUS----IDENTIFIER   
+        │                                           └── 'COMPLETED'----IDENTIFIER
+        ├── USER_STATUS----CONDITION
+        │   └── CASE----HEAD CASE
+        │       ├── =----OPERATOR
+        │       │   ├── WHEN----CLAUSE
+        │       │   │   └── U.IS_ACTIVE----IDENTIFIER
+        │       │   └── 1----IDENTIFIER
+        │       ├── THEN----CLAUSE
+        │       │   └── 'ACTIVE'----IDENTIFIER
+        │       └── ELSE----CLAUSE
+        │           └── 'INACTIVE'----IDENTIFIER
+        └── FROM----CLAUSE
+            ├── USERS(U)----IDENTIFIER
+            ├── LEFT JOIN----CLAUSE
+            │   ├── USER_ROLES(UR)----IDENTIFIER
+            │   ├── =----OPERATOR
+            │   │   ├── ON----CLAUSE
+            │   │   │   └── U.USER_ID----IDENTIFIER
+            │   │   └── UR.USER_ID----IDENTIFIER
+            │   └── LEFT JOIN----CLAUSE
+            │       ├── ROLES(R)----IDENTIFIER
+            │       └── =----OPERATOR
+            │           ├── ON----CLAUSE
+            │           │   └── UR.ROLE_ID----IDENTIFIER
+            │           └── R.ROLE_ID----IDENTIFIER
+            └── WHERE----CLAUSE
+                ├── AND----OPERATOR
+                │   ├── >=----OPERATOR
+                │   │   ├── U.REGISTRATION_DATE----IDENTIFIER
+                │   │   └── '2020-01-01'----IDENTIFIER
+                │   └── AND----OPERATOR
+                │       ├── =----OPERATOR
+                │       │   ├── R.ROLE_NAME----IDENTIFIER
+                │       │   └── 'CUSTOMER'----IDENTIFIER
+                │       └── EXISTS----CLAUSE
+                │           └── SubQuery----SUBQUERY
+                │               ├── SELECT----COMMAND
+                │               │   └── 1----IDENTIFIER
+                │               ├── FROM----CLAUSE
+                │               │   └── ORDERS(O)----IDENTIFIER
+                │               └── WHERE----CLAUSE
+                │                   └── AND----OPERATOR
+                │                       ├── =----OPERATOR
+                │                       │   ├── O.USER_ID----IDENTIFIER
+                │                       │   └── U.USER_ID----IDENTIFIER
+                │                       └── BETWEEN----OPERATOR
+                │                           ├── O.ORDER_DATE----IDENTIFIER
+                │                           └── AND----OPERATOR
+                │                               ├── '2022-01-01'----IDENTIFIER
+                │                               └── '2023-01-01'----IDENTIFIER
+                └── ORDER BY----CLAUSE
+                    ├── DESC----CLAUSE
+                    │   └── AVG_PRICE_OF_COMPLETED_ORDERS----IDENTIFIER
+                    └── ASC----CLAUSE
+                        └── COMPLETED_ORDERS----IDENTIFIER
+
+    Resultat (2) : VRAIE
+    └── Query----QUERY
+    ├── SELECT----COMMAND
+    │   └── *----IDENTIFIER
+    ├── FROM----CLAUSE
+    │   └── ETUDIANTS----IDENTIFIER
+    └── WHERE----CLAUSE
+        └── AND----OPERATOR
+            ├── CONDITION----EXPRESSION
+            │   └── AND----OPERATOR
+            │       ├── !=----OPERATOR
+            │       │   ├── MATIERE----IDENTIFIER
+            │       │   └── NULL----IDENTIFIER
+            │       └── =----OPERATOR
+            │           ├── CODE----IDENTIFIER
+            │           └── 0----IDENTIFIER
+            └── CONDITION----EXPRESSION
+                └── OR----OPERATOR
+                    ├── =----OPERATOR
+                    │   ├── CONDITION----IDENTIFIER        
+                    │   └── TRUE----IDENTIFIER
+                    └── =----OPERATOR
+                        ├── ANOTHER_CONDITION----IDENTIFIER
+                        └── FALSE----IDENTIFIER
+
+
+
+    Fonction: VER2
+    public Node determineParent(Node root,Node currentNode,Node node) {
+        Node parent = root;
+
+        if(!(currentNode instanceof Leaf)) {
+            if(currentNode.getKey() != null && (this.getPrecedence(currentNode.getKey()) < this.getPrecedence(node.getKey()) )) { // verifie si la clause precedente est prioritaire , si oui on apparente la clause actuelle
+                parent = currentNode;
+
+            } else if(this.getPrecedence(node.getKey()) == this.getPrecedence(currentNode.getKey())) { // apparente les clauses qui ne sont pas prioritaire a la derniere clause enfant du tronc
+                parent = currentNode.getParent();
+            } else if(this.getPrecedence(node.getKey()) > 1) {
+                if(root.getChildren().isEmpty()) {
+                    parent = root;
+                } else {
+                    int lastIndex = root.getChildren().size()-1;
+                    Node lastChild = root.getChildren().get(lastIndex);
+                    while(lastChild instanceof Leaf && lastChild != null) {
+                        lastChild = lastChild.getParent();
+                    } 
+                    if(lastChild != null) {
+                        parent = lastChild;
+                    }
+                }
+            }
+        } else {
+            parent = root;
+        }
+
+        return parent;
+    }
+
+    Resultat (1) : VRAIE
+    └── Query----QUERY
+    ├── SELECT----COMMAND
+    │   ├── U.USER_ID----IDENTIFIER
+    │   ├── U.USERNAME----IDENTIFIER
+    │   ├── COMPLETED_ORDERS----SUBQUERY
+    │   │   ├── SELECT----COMMAND
+    │   │   │   └── Function----FUNCTION
+    │   │   │       └── COUNT----HEAD FUNCTION
+    │   │   │           └── *----IDENTIFIER
+    │   │   ├── FROM----CLAUSE
+    │   │   │   └── ORDERS(O)----IDENTIFIER
+    │   │   └── WHERE----CLAUSE
+    │   │       └── AND----OPERATOR
+    │   │           ├── =----OPERATOR
+    │   │           │   ├── O.USER_ID----IDENTIFIER
+    │   │           │   └── U.USER_ID----IDENTIFIER
+    │   │           └── =----OPERATOR
+    │   │               ├── O.STATUS----IDENTIFIER
+    │   │               └── 'COMPLETED'----IDENTIFIER
+    │   ├── AVG_PRICE_OF_COMPLETED_ORDERS----SUBQUERY
+    │   │   ├── SELECT----COMMAND
+    │   │   │   └── PRICE----FUNCTION
+    │   │   │       └── AVG----HEAD FUNCTION
+    │   │   │           └── P.PRICE----IDENTIFIER
+    │   │   ├── FROM----CLAUSE
+    │   │   │   └── PRODUCTS(P)----IDENTIFIER
+    │   │   └── WHERE----CLAUSE
+    │   │       └── IN----OPERATOR
+    │   │           ├── P.PRODUCT_ID----IDENTIFIER
+    │   │           └── SubQuery----SUBQUERY
+    │   │               ├── SELECT----COMMAND
+    │   │               │   └── OI.PRODUCT_ID----IDENTIFIER
+    │   │               ├── FROM----CLAUSE
+    │   │               │   └── ORDER_ITEMS(OI)----IDENTIFIER       
+    │   │               └── WHERE----CLAUSE
+    │   │                   └── IN----OPERATOR
+    │   │                       ├── OI.ORDER_ID----IDENTIFIER       
+    │   │                       └── SubQuery----SUBQUERY
+    │   │                           ├── SELECT----COMMAND
+    │   │                           │   └── O.ORDER_ID----IDENTIFIER
+    │   │                           ├── FROM----CLAUSE
+    │   │                           │   └── ORDERS(O)----IDENTIFIER 
+    │   │                           └── WHERE----CLAUSE
+    │   │                               └── AND----OPERATOR
+    │   │                                   ├── =----OPERATOR
+    │   │                                   │   ├── O.USER_ID----IDENTIFIER  
+    │   │                                   │   └── U.USER_ID----IDENTIFIER  
+    │   │                                   └── =----OPERATOR
+    │   │                                       ├── O.STATUS----IDENTIFIER   
+    │   │                                       └── 'COMPLETED'----IDENTIFIER
+    │   └── USER_STATUS----CONDITION
+    │       └── CASE----HEAD CASE
+    │           ├── =----OPERATOR
+    │           │   ├── WHEN----CLAUSE
+    │           │   │   └── U.IS_ACTIVE----IDENTIFIER
+    │           │   └── 1----IDENTIFIER
+    │           ├── THEN----CLAUSE
+    │           │   └── 'ACTIVE'----IDENTIFIER
+    │           └── ELSE----CLAUSE
+    │               └── 'INACTIVE'----IDENTIFIER
+    ├── FROM----CLAUSE
+    │   ├── USERS(U)----IDENTIFIER
+    │   ├── LEFT JOIN----CLAUSE
+    │   │   ├── USER_ROLES(UR)----IDENTIFIER
+    │   │   └── =----OPERATOR
+    │   │       ├── ON----CLAUSE
+    │   │       │   └── U.USER_ID----IDENTIFIER
+    │   │       └── UR.USER_ID----IDENTIFIER
+    │   └── LEFT JOIN----CLAUSE
+    │       ├── ROLES(R)----IDENTIFIER
+    │       └── =----OPERATOR
+    │           ├── ON----CLAUSE
+    │           │   └── UR.ROLE_ID----IDENTIFIER
+    │           └── R.ROLE_ID----IDENTIFIER
+    ├── WHERE----CLAUSE
+    │   └── AND----OPERATOR
+    │       ├── AND----OPERATOR
+    │       │   ├── >=----OPERATOR
+    │       │   │   ├── U.REGISTRATION_DATE----IDENTIFIER
+    │       │   │   └── '2020-01-01'----IDENTIFIER
+    │       │   └── =----OPERATOR
+    │       │       ├── R.ROLE_NAME----IDENTIFIER
+    │       │       └── 'CUSTOMER'----IDENTIFIER
+    │       └── EXISTS----CLAUSE
+    │           └── SubQuery----SUBQUERY
+    │               ├── SELECT----COMMAND
+    │               │   └── 1----IDENTIFIER
+    │               ├── FROM----CLAUSE
+    │               │   └── ORDERS(O)----IDENTIFIER
+    │               └── WHERE----CLAUSE
+    │                   └── AND----OPERATOR
+    │                       ├── =----OPERATOR
+    │                       │   ├── O.USER_ID----IDENTIFIER
+    │                       │   └── U.USER_ID----IDENTIFIER
+    │                       └── BETWEEN----OPERATOR
+    │                           ├── O.ORDER_DATE----IDENTIFIER
+    │                           └── AND----OPERATOR
+    │                               ├── '2022-01-01'----IDENTIFIER
+    │                               └── '2023-01-01'----IDENTIFIER
+    └── ORDER BY----CLAUSE
+        ├── DESC----CLAUSE
+        │   └── AVG_PRICE_OF_COMPLETED_ORDERS----IDENTIFIER
+        └── ASC----CLAUSE
+            └── COMPLETED_ORDERS----IDENTIFIER
+
+    Resultat (2): FAUX
+    └── Query----QUERY
+    ├── SELECT----COMMAND
+    │   └── *----IDENTIFIER
+    ├── FROM----CLAUSE
+    │   └── ETUDIANTS----IDENTIFIER
+    └── WHERE----CLAUSE
+        └── AND----OPERATOR
+            ├── CONDITION----EXPRESSION
+            │   └── !=----OPERATOR
+            │       ├── MATIERE----IDENTIFIER
+            │       └── AND----OPERATOR
+            │           ├── NULL----IDENTIFIER
+            │           └── =----OPERATOR
+            │               ├── CODE----IDENTIFIER
+            │               └── 0----IDENTIFIER
+            └── CONDITION----EXPRESSION
+                └── =----OPERATOR
+                    ├── CONDITION----IDENTIFIER
+                    └── OR----OPERATOR
+                        ├── TRUE----IDENTIFIER
+                        └── =----OPERATOR
+                            ├── ANOTHER_CONDITION----IDENTIFIER
+                            └── FALSE----IDENTIFIER
+
+

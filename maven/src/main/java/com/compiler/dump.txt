@@ -1,0 +1,74 @@
+    public Relation processWhere(String tableName,Relation table,Node whereRoot) throws Exception {
+        // obtenir les domaines de la table ainsi que leur type
+        HashMap<String,String> mappedDomaines = this.manager.getDomaine(this.dbName,tableName);
+        // obtenir l'enfant du node where
+        Node whereChild = whereRoot.getChildren().get(0);
+        // declarer la table filtrée
+        Relation filteredRelation = new Relation();
+
+        // instancier la clé et le type de l'enfant
+        String key = whereChild.getKey();
+        String type = whereChild.getType();
+
+        Node leftNode = whereRoot.getChildren().get(0);
+        Node rightNode = whereRoot.getChildren().get(1);
+
+        if(whereRoot.getKey().equalsIgnoreCase("AND")) {
+            Relation r1 = table.applyFirstCondition;
+            Relation r2 = r1.applySecondCondition;
+        } else if(whereRoot.getKey().equalsIgnoreCase("OR")) {
+            Relation r1 = table.applyFirstCondition;
+            Relation r2 = table.applySecondCondition;
+            Relation r3 = r1.union.r2;
+        } else if(whereRoot.getKey().equals("WHERE")) {
+            Node whereChild = whereRoot.getChildren().get(0);
+            Relation r1 = processWhere(tableName,table,whereChild);
+        } else {
+
+        }
+
+        // si l'enfant est un operateur different de AND et OR
+        if(type.equalsIgnoreCase("OPERATOR") && !(key.equalsIgnoreCase("AND") || key.equalsIgnoreCase("OR"))) {
+            // instancier un nouveau string pour l'operateur
+            String operator = key;
+            // obtenir les enfants de l'opérateur
+            Node leftNode = whereChild.getChildren().get(0);
+            Node rightNode = whereChild.getChildren().get(1);
+
+            // le nom du domaine ou de la colonne concernée
+            String targetedColumn = ((Leaf) leftNode).getValue();
+
+            // l'objet à comparer parsé en fonction du type de targetedColumn avec mappedDomaines
+            Object value = JSONStringParser.parseValue(((Leaf) right).getValue(),mappedDomaines.get(targetedColumn));
+            
+            //effectuer l'opération de selection (filtrage avec where)
+            filteredRelation = table.selection(targetedColumn,operator,value);
+        } else if(key.equalsIgnoreCase("AND")) {
+            Relation r1 = processWhere(tableName,table,whereChild);
+        }
+    }
+
+           for(Node columnNode:select.getColumns()) {
+                if(columnNode instanceof Leaf) {
+                    if(!groupBy.getColumns().contains(((Leaf) columnNode).getValue())) {
+                        throw new Exception("Columns should be in 'group by' clause or aggregation function");
+                    } else {
+                        nuplet.add(((Leaf) columnNode).getValue());
+                    }
+                }
+                if(!(columnNode instanceof Leaf)) {
+                    Node functionNode = columnNode.getChildren().get(0);
+                    String columnName = ((Leaf) functionNode.getChildren().get(0)).getValue();
+                    List<Object> objects = sourceTable.getListObjectOf(columnName);
+                    Utils util = new Utils();
+                    Method aggregationFunction = util.getClass().getMethod(functionNode.getKey().toLowerCase(),objects.getClass());
+                    double value = Double.parseDouble(aggregationFunction.invoke(util,objects).toString());
+
+                    String finalColumnName = functionNode.getKey()+"("+columnName+")";
+                    if(!columnNode.getKey().equals("FUNCTION")) {
+                        finalColumnName = columnNode.getKey();
+                    }
+
+                    nuplet.add(finalColumnName,value);
+                }
+            }

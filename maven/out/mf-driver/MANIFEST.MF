@@ -1,0 +1,2 @@
+Manifest-Version: 1.0 
+Driver-Class: com.jdbc.MyDriver

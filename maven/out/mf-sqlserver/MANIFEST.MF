@@ -1,0 +1,5 @@
+Manifest-Version: 1.0 
+Main-Class: com.socket.ServerManager 
+Class-Path: SGBD-1.0-SNAPSHOT.jar jackson-core-2.11.1.jar jackson-databind-2.11.1.jar jackson-annotations-2.11.1.jar
+
+
