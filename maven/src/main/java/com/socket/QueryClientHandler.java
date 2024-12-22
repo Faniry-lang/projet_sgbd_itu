@@ -137,7 +137,7 @@ public class QueryClientHandler extends Thread {
      * @param sql La requête SQL à écrire dans le fichier log.
      */
     private void writeLog(String sql) {
-        String logFilePath = "../log/log.txt";
+        String logFilePath = "./lightsql/log/log.txt";
         try (FileWriter writer = new FileWriter(logFilePath, true);
              BufferedWriter bufferedWriter = new BufferedWriter(writer)) {
             

@@ -7,7 +7,7 @@ import java.util.Map;
 import java.util.ArrayList;
 
 public class ConfigLoader {
-    private static final String CONFIG_FILE = "../conf/config.txt";
+    private static final String CONFIG_FILE = "./lightsql/conf/config.txt";
     private Map<Integer, String> dbPaths;
     private Map<Integer, String> dbTypes;
 

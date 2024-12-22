@@ -155,6 +155,7 @@ public class AbstractSyntaxTree {
             String left = ((Leaf) operator.getChildren().get(0)).getValue();
             String right = ((Leaf) operator.getChildren().get(1)).getValue();
             joins[count] = new Join(source,left,operator.getKey(),right);
+            count++;
         }
 
         return joins;

@@ -16,6 +16,8 @@ jar cfm lsql_server.jar mf-sqlserver/MANIFEST.MF -C ../target/classes . -C resou
 jar cfm lsql_replica.jar mf-sqlserver/MANIFEST.MF -C ../target/classes . -C resources/ .
 
 
+SELECT s.title AS song_title, a.name AS artist_name, g.genre_name, s.duration FROM Songs as s JOIN Artists as a ON s.artist_id = a.artist_id JOIN Genres as g ON s.genre_id = g.genre_id
+
 --module-path "C:javafx-sdk/lib" --add-modules javafx.controls,javafx.fxml
 
 jar cfm sqlserver.jar MANIFEST.MF -C target/classes/ . 

@@ -546,10 +546,10 @@ public class SQLCompiler {
 
     public static void main(String[] args) {
         try {
-            String dbName = "COOPERATIVE";
+            String dbName = "MUSIQUE";
             ConfigLoader loader = new ConfigLoader();
             String dbPath = loader.getDbPath(3000);
-            SQLCompiler compiler = new SQLCompiler(dbName,dbPath);
+            SQLCompiler compiler = new SQLCompiler(dbName,"C:\\LightSql\\db");
             // Domaine[] domaine = new Domaine[4];
             // domaine[0] = new Domaine("titre","varchar");
             // domaine[1] = new Domaine("auteur","varchar");
@@ -666,6 +666,9 @@ String query4 = "SELECT * FROM PRODUITS " +
                           "Email VARCHAR," +
                           "SiteWeb VARCHAR" +
                           ")";
+
+            String query = "SELECT s.title AS song_title, a.name AS artist_name, g.genre_name, s.duration FROM Songs as s JOIN Artists as a ON s.artist_id = a.artist_id JOIN Genres as g ON s.genre_id = g.genre_id";
+            Object result = compiler.compile(query);
 
             // String query = "select p.nom,d.nom,p.prix from produits p join distributeur d on p.id = d.id order by p.prix asc";
 

@@ -325,6 +325,7 @@ public class Relation implements Serializable {
         Relation produit = this.produitCartesien(relation);
         Relation joined = new Relation(produit.getDomaines());
         for(Nuplet nuplet:produit.getNuplets()) {
+            relation.afficher();
             Object valA = nuplet.get(colA);
             Object valB = nuplet.get(colB);
             boolean equal = compareValues(valA, operator, valB);
